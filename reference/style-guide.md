@@ -46,13 +46,14 @@
 | 公式 | Times New Roman Italic | 34–36px 白 + drop-shadow 3px |
 | 代码/向量数字 | 等宽 FONT_MONO | 22–24px |
 
-### 3.1 英文片（`config.ts` 的 `lang: 'en'`）
-Noto Sans SC 自带完整拉丁字形（实测 wght 100–900 全覆盖），所以**不需要再加字体**：正文、标签、字幕仍用 `FONT_HEAVY`，展示大字用 Audiowide / Orbitron。三条差异由 `lang` 自动生效，别在镜头里手写死值：
-- **不压窄**：`SQUEEZE`（`common/lib.tsx`）中文 .85 / 英文 1。拉丁字母 scaleX .85 会明显变形。片头、章节卡已经用它。
-- **基线不预扣**：`CText` 的 `dy` 默认取 `TEXT_DY`（中文 −2 / 英文 0）——CJK 行盒的墨迹偏低，拉丁不偏。
+### 3.1 英文 / 德文片（`config.ts` 的 `lang: 'en'` / `'de'`）
+Noto Sans SC 自带完整拉丁字形（实测 wght 100–900 全覆盖，含德文 äöüÄÖÜß；Audiowide / Orbitron / Exo 2 也都有），所以**不需要再加字体**：正文、标签、字幕仍用 `FONT_HEAVY`，展示大字用 Audiowide / Orbitron。英文与德文共用一套拉丁排版参数（`common/lib.tsx` 的 `IS_CJK`），三条差异由 `lang` 自动生效，别在镜头里手写死值：
+- **不压窄**：`SQUEEZE`（`common/lib.tsx`）中文 .85 / 英文、德文 1。拉丁字母 scaleX .85 会明显变形。片头、章节卡已经用它。
+- **基线不预扣**：`CText` 的 `dy` 默认取 `TEXT_DY`（中文 −2 / 拉丁 0）——CJK 行盒的墨迹偏低，拉丁不偏。
 - **宽度兜底**：字幕、进度条章名、章节卡标题、片头大字都过 `fitSize()`（`common/textfit.ts`，按实测 em 宽估算，纯函数所以渲染确定）。它只是兜底：超预算说明文案该切，见 `narration-storyboard.md` §5。
 - 英文片里 `TechText`（Exo 2 紫斜体）只用于**术语强调**，不要整句用——整段斜体在英文里读起来像引文。
 - 一行英文大写词比中文占宽得多：Audiowide 大写平均 .79em、Orbitron .82em、Noto 大写 .67em / 小写 .57em（fontTools 实测）。估宽用 `textW(s, size, EM_WIDE|EM_ORB|EM_TECH, letterSpacing)`；带 `letterSpacing` 的大字（片头、章节卡）要把它传进去——它是固定 px、不随字号缩，`fitSize()` 同样有这个参数。
+- **德文片额外注意引号**：Noto Sans SC 的 “ ” ‘ ’ 是 1em 全角字形（fontTools 实测），德文 „…“ 会在字幕里撑出一个汉字宽的空洞；文案用 »…«（.43em）或不用引号。变音字母 äöü .54–.59em、ÄÖÜ .57–.71em、ß .59em，都落在 `textEm()` 对 Latin-1 的 .58 估算带内，不用改表。
 
 ## 4. 图元目录（`src/ui.tsx`，镜头 `import {…} from '../../ui'`）
 | 组件 | 用途 | 关键 props |

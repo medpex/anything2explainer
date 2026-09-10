@@ -9,17 +9,17 @@
 ```
 写法要点（对照 `examples/rag/narration.txt`）：
 - 结构：章数按内容定，不按时长定——一章讲透或多章概览都行，常见 3–5 章。第 1 章"为什么"（问题 → 类比 → 主角登场 → 出处），中间各章"怎么做"（按流水线分步，每步一句"第 N 步 + 动作"开头），末章"评估 + 进阶 + 争议 + 回到比喻收尾"。章少时把评估与进阶压进末章；章多时把"怎么做"拆得更细，不要靠灌水拉长。
-- 篇幅：**按用户定的时长取表里那一档**（如 3–5 分钟 → 40–50 句、1200–1500 字）。语速约 6 字/秒（英文约 2.5 词/秒），加留白后成片密度 4.5–5 字/秒。每句 ≤35 字，长句用竖线切成 2–5 块。写完先估时长，超/欠 15% 就加删句子。
+- 篇幅：**按用户定的时长取表里那一档**（如 3–5 分钟 → 40–50 句、1200–1500 字）。语速约 6 字/秒（英文约 2.5 词/秒、德文约 2.0 词/秒），加留白后成片密度 4.5–5 字/秒。每句 ≤35 字，长句用竖线切成 2–5 块。写完先估时长，超/欠 15% 就加删句子。
 - 一个贯穿比喻（开卷考试）+ 一个贯穿示例（差旅报销），首尾呼应。
 - 数字只用调研文档 §数字清单里有出处的；给出机构和年份（"Anthropic 2024 年的实验"）；易变数字加"发布时/截至 X 年"。
-- 英文术语第一次出现时中文在前英文在后；缩写要读得出来（RAG、HNSW、BM25 直接读字母）。
+- 英文术语第一次出现时中文在前英文在后；缩写要读得出来（RAG、HNSW、BM25 直接读字母）。英文 / 德文片的术语写法见 §2.5 / §2.6。
 - 每句都要能画：写词时同步想"这句画什么"，画不出的句子改写或删。
 - 章节标题即进度条章名；章内小节名即 HUD 胶囊词（后面写进 config.ts）。
 
 ## 2. 配音（`scripts/tts_build.py`）
 - **跑之前先过 SKILL.md 的确认点 2（文案定稿）与确认点 3（配音）**：问一句用户有没有偏好的 TTS，没有就用默认，不要摆一堆选项让他挑。
 - 引擎（`TTS_ENGINE`，默认 `auto` 按解说词语言选）：
-  - `edge` **中文默认**。edge-tts，`VOICE=zh-CN-YunxiNeural RATE=+8%`（男声，科普感）；可选 YunjianNeural（激昂）/ YunyangNeural（播报）/ XiaoxiaoNeural（女声）。有词级边界，字幕节拍最准。
+  - `edge` **中文、德文默认**。edge-tts，中文 `VOICE=zh-CN-YunxiNeural RATE=+8%`（男声，科普感）；可选 YunjianNeural（激昂）/ YunyangNeural（播报）/ XiaoxiaoNeural（女声）。德文默认 `de-DE-ConradNeural +5%`（见 §2.6）。有词级边界（脚本显式请求 `WordBoundary`），字幕节拍最准。VOICE / RATE 不传时按解说词语言取默认。
   - `kokoro` **英文默认**。kokoro-82m 本地推理：`KOKORO_VOICE=am_liam KOKORO_LANG=a KOKORO_SPEED=1.0`——Liam，男声，与中文云希同定位。需 `pip install kokoro soundfile` + `brew install espeak-ng`。
   - kokoro 没有词边界 → 改为逐字幕块分别合成再拼接：块起始帧因此仍是精确的，但块界断句略生硬（`CHUNK_PAD` 调块间静音）。
   - 用户有偏好的 TTS（含真人配音 / 声音克隆）：不跑这个脚本，把成品放 `public/assets/<slug>/audio.wav`，自己按逐句/逐块时间轴填 `src/common/timeline.ts` 与 `subs.ts`（格式见文件头），接口一致。
@@ -46,6 +46,25 @@
 - **配音**：默认 kokoro `am_liam`；想要词级边界（节拍最准）可以用 `TTS_ENGINE=edge VOICE=en-US-AndrewNeural`（云端）。
 - **排版**：不压窄、居中不预扣基线、宽度兜底，都由 `lang` 自动生效，见 `style-guide.md` §3.1。
 - 英文成片《RAG & Knowledge Bases》见 README 顶部视频（5′02″，kokoro `am_liam` 自然语速，由中文版逐镜头重排帧号而来）；过程文件（分镜、源码、QC）仍只有中文样片的，**视觉标尺看 `examples/rag/frames/`**（图形语言与语言无关）。
+
+## 2.6 德文片（`config.ts` 的 `lang: 'de'`）
+排版按拉丁字母片处理：§2.5 的规则（不压窄、基线不预扣、`title.rest` 留空、`chapterTech` 写短 kicker 或留空、每块字幕 ≤48 字符、`tts_build.py` 用空格拼块）全部照用，只有下面几点不同。**开工先把 `src/config.ts` 的 `lang` 改成 `'de'`**（`tts_build.py` 判到德文而 config 不是 `'de'` 会打 ⚠）。
+- **篇幅**（语速：edge-tts `de-DE-ConradNeural` +5% 按 `tts_build.py` 表头读数实测 ≈ 2.7 词/秒（去句内外静音；整段朗读含停顿约 2.2–2.3 词/秒）；加句间 / 章前留白后成片密度 ≈ 2.0 词/秒。德文词比英文长，同样时长比英文少写约 15% 的词）：
+
+  | 时长 | 德文词数 | 句 / 镜头数 |
+  |---|---|---|
+  | 2–3 分钟 | 240–360 | 24–32 |
+  | 3–5 分钟 | 360–600 | 40–50 |
+  | 5–8 分钟 | 600–960 | 60–80 |
+
+- **每句 ≤16 词**（对应英文 ≤20 词），长句用 `|` 切成 2–5 块；每块 ≤48 字符只装得下 6–7 个德文词。复合名词（Wissensdatenbank、Reisekostenrichtlinie）一个词就吃掉 20 字符，写文案时优先短词或拆写（"Datenbank für Wissen"）。
+- **配音**：默认 edge-tts `de-DE-ConradNeural +5%`（`TTS_ENGINE=auto` 判到德文就走 edge，有词级边界）；备选 `de-DE-KillianNeural`（男，比 Conrad 慢约 5%）、`de-DE-FlorianMultilingualNeural`（男，比 Conrad 快约 2%，英文术语读得更像英文）、`de-DE-KatjaNeural` / `de-DE-SeraphinaMultilingualNeural`（女）。**kokoro-82m 没有德文**，`TTS_ENGINE=kokoro` 会被脚本直接拒绝。
+- **引号**：Noto Sans SC 里 “ ” ‘ ’ 是 1em 的全角字形，德文 „…“ 会在 44px 字幕里撑出一个汉字宽的空洞——文案**不要用 „“ / “”**，要引用就用 »…«（.43em）或不用引号。破折号用 –（en dash，.53em），不用 —（.88em）。
+- **术语**：首次出现写德文说法 + 括号英文缩写（`Retrieval-Augmented Generation (RAG)`），之后一律用缩写；英文术语保持原文不硬翻（Embedding、Token、Chunk），但 Conrad 会按德式发音读英文词——确认点 4 听一遍，别扭的在文案里换成德文词（如 Embedding → Vektor）。缩写要能读出来（RAG / HNSW / BM25 读字母）。
+- **数字**：小数写德式逗号（"0,5"），千位分隔用点或空格（"1.000"）；年份直接写数字（"2024"）。edge-tts 德文按德语规则朗读。
+- **章名**（进度条）：槽宽 = 1280 ÷ 章数，德文词长，**≤12 字符最稳**（"Grundlagen" / "Indexierung" / "Abruf" / "Bewertung"），>14 字符会自动缩到 17px 发虚；章节卡标题 80px 最多约 22 字符。
+- **语言判定**：`tts_build.py` 的 `detect_lang` 按德 / 英功能词计数分辨（德文里夹英文术语不会误判）；万一判错，显式传 `TTS_ENGINE=edge VOICE=de-DE-ConradNeural RATE=+5%`。
+- 目前没有德文样片；视觉标尺仍看 `examples/rag/frames/`。
 
 ## 3. 分镜（`script/storyboard_src.md` → `分镜表.md`）
 令牌：`{S12.from}` `{S12.to}` `{S12.c3}`（第 3 个字幕块起始帧）`{C2}`（第 2 章起始帧）`{TOTAL}`，可带 ±整数：`{S12.from-8}`。`python3 scripts/render_storyboard.py` 填帧号。

@@ -5,10 +5,10 @@ import {fitSize, textW} from './textfit';
 
 /**
  * 字幕：白 #FFF Noto Sans SC 700 44px、居中 x=640、CSS top 637（墨迹 y644–684）、黑描边 4px（16+8+4 方向 text-shadow 环，避免 -webkit-text-stroke 的尖角刺）、
- * 无底框（靠雾底衬托）、进出单帧硬切。条目由 scripts/tts_build.py 从配音词边界生成（每块中文 ≤16 字 / 英文 ≤48 字符）。
+ * 无底框（靠雾底衬托）、进出单帧硬切。条目由 scripts/tts_build.py 从配音词边界生成（每块中文 ≤16 字 / 英文、德文 ≤48 字符）。
  */
 export const SUB_STYLE = {fontSize: 44, weight: 700, top: 637, color: '#FFFFFF', stroke: 4, strokeColor: '#000000'};
-export const SUB_MAX_W = 1160; // 安全区 x60–1220；超宽自动缩到 34px 兜底（中文 ≤16 字 / 英文 ≤48 字符本来就装得下）
+export const SUB_MAX_W = 1160; // 安全区 x60–1220；超宽自动缩到 34px 兜底（中文 ≤16 字 / 英文、德文 ≤48 字符本来就装得下）
 const ring = (r: number, k: number, col: string) => Array.from({length: k}, (_, i) => {
   const a = (i / k) * Math.PI * 2;
   return `${(Math.cos(a) * r).toFixed(2)}px ${(Math.sin(a) * r).toFixed(2)}px 0 ${col}`;

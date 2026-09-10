@@ -47,7 +47,7 @@ export const DirBlur: React.FC<{bx: number; by: number; style?: React.CSSPropert
   );
 };
 
-// ---- 字体（全部随模板附带，OFL 许可；Noto Sans SC 含完整拉丁字形，英文片同样用它做正文/字幕）----
+// ---- 字体（全部随模板附带，OFL 许可；Noto Sans SC 含完整拉丁字形（含 äöüß），英文 / 德文片同样用它做正文/字幕）----
 export const FONT_HEAVY = `'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', sans-serif`; // 全部中文：标题 900（常 scaleX .8–.85 压窄）、标签 600–800、字幕 700
 export const FONT_TECH = `'Exo 2', 'Helvetica Neue', sans-serif`; // 英文技术词：紫色粗斜体 + scaleX .8
 export const FONT_WIDE = `'Audiowide', 'Orbitron', sans-serif`; // 宽体展示字（片名 / 大写缩写）
@@ -57,12 +57,14 @@ export const FONT_SERIF = `'Times New Roman', Times, serif`; // 公式
 export const FONT_EN = `'Helvetica Neue', Helvetica, Arial, sans-serif`;
 
 // ---- 语言开关（src/config.ts 的 VIDEO.lang）----
-/** 'zh' 中文片（默认）｜'en' 英文片。影响：字体压窄系数、基线补偿、文案与字幕预算（见 reference/narration-storyboard.md §5）。 */
+/** 'zh' 中文片（默认）｜'en' 英文片｜'de' 德文片。影响：字体压窄系数、基线补偿、文案与字幕预算（见 reference/narration-storyboard.md §2.5 / §2.6）。 */
 export const LANG = VIDEO.lang ?? 'zh';
-/** 中文标题惯用 scaleX .8–.85 压窄；拉丁字母压窄会变形，英文片一律 1。 */
-export const SQUEEZE = LANG === 'en' ? 1 : 0.85;
+/** CJK 排版还是拉丁排版：英文与德文共用一套拉丁参数，新增拉丁语言时只改这一处。 */
+export const IS_CJK = LANG === 'zh';
+/** 中文标题惯用 scaleX .8–.85 压窄；拉丁字母压窄会变形，英文 / 德文片一律 1。 */
+export const SQUEEZE = IS_CJK ? 0.85 : 1;
 /** CJK 行盒 ascent 让墨迹比 top 低 3–7px，居中要预扣；拉丁不需要。 */
-export const TEXT_DY = LANG === 'en' ? 0 : -2;
+export const TEXT_DY = IS_CJK ? -2 : 0;
 
 /** 在 Main 顶层挂一次；用 delayRender 等字体就绪。 */
 export const Fonts: React.FC = () => {

@@ -7,11 +7,12 @@ export type RailSpec = {steps: string[]; switchS: string[]; fromS: string; toS: 
 export const VIDEO = {
   slug: 'demo', // 素材目录 public/assets/<slug>/（配音 audio.wav 由 tts_build.py 写到这里）
   /**
-   * 片子语言：'zh' 中文（默认）｜'en' 英文。
-   * 影响 → 配音引擎（tts_build.py 的 TTS_ENGINE=auto 也会自己按解说词判语言）、标题/章节卡是否压窄（拉丁不压）、
-   * 居中文字的基线补偿（CJK −2 / 拉丁 0）、文案与字幕块长度预算（见 reference/narration-storyboard.md §5）。
+   * 片子语言：'zh' 中文（默认）｜'en' 英文｜'de' 德文。
+   * 影响 → 配音引擎与默认音色（tts_build.py 的 TTS_ENGINE=auto 也会自己按解说词判语言；德文只有 edge-tts）、
+   * 标题/章节卡是否压窄（拉丁不压）、居中文字的基线补偿（CJK −2 / 拉丁 0）、文案与字幕块长度预算
+   * （见 reference/narration-storyboard.md §2.5 英文 / §2.6 德文）。
    */
-  lang: 'zh' as 'zh' | 'en',
+  lang: 'zh' as 'zh' | 'en' | 'de',
   /**
    * 幕底：'stars' 星点 + 雾底渐变（默认，样片风格）｜'dots' 点阵波（video-talkcraft dot-field-wave 移植，`common/DotFieldBg.tsx`）。
    * 两者互斥；镜头里的 BG_Gn 覆写（`stars:'none'` 关幕底）对两种方案都生效。frame_metrics.py 会按这里的值抠掉幕底再统计。
@@ -19,7 +20,7 @@ export const VIDEO = {
   bg: 'stars' as 'stars' | 'dots',
   /**
    * 片头。中文片：big 用 Audiowide 宽体（缩写/英文词），rest 用 Noto 900（中文部分），en 是英文全称，tagline 一句话钩子。
-   * 英文片：rest 留空 ''（不显示），big 放主词/缩写，en 放全称或副标，tagline 一句话钩子。
+   * 英文 / 德文片：rest 留空 ''（不显示），big 放主词/缩写，en 放全称或副标，tagline 一句话钩子。
    */
   title: {big: 'RAG', rest: '与知识库', en: 'Retrieval-Augmented Generation', tagline: '让大模型开卷考试'},
   /** 章节英文副标（顺序对应 narration 的 CHAPTER 1..n；章节卡从第 2 章起显示） */

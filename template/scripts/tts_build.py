@@ -4,8 +4,8 @@
   # CHAPTER <n> <标题>      章节标记（章节前自动加 chapter_gap 帧空白）
   ## gap <帧数>             在下一句前额外插入空白帧
   一句话|按竖线分成字幕短句            → 竖线只切字幕，不影响朗读
-                                       每块预算：中文 ≤16 字 / 英文 ≤48 字符（超了会打 ⚠ 并自动缩字号）
-                                       块首尾空格会去掉；英文片把块用空格拼回整句给 TTS（"a|b" 与 "a | b" 等价），中文直接拼接
+                                       每块预算：中文 ≤16 字 / 英文、德文 ≤48 字符（超了会打 ⚠ 并自动缩字号）
+                                       块首尾空格会去掉；拉丁语言片（英/德）把块用空格拼回整句给 TTS（"a|b" 与 "a | b" 等价），中文直接拼接
 输出：
   public/assets/<slug>/audio.wav（48k 立体声 16bit；slug 读 src/config.ts）
   script/timeline.json / timeline.md
@@ -13,8 +13,12 @@
 逐句（或逐字幕块）缓存于 audio/cache/，改一句只重合成一句。
 
 TTS 引擎（`TTS_ENGINE`，默认 `auto` = 按解说词语言选；**跑之前先问用户有没有偏好的 TTS**，见 SKILL.md 确认点 3）：
-  edge     中文默认。edge-tts 云端合成，有词级边界 → 字幕节拍最准。VOICE=zh-CN-YunxiNeural RATE=+8%
-  kokoro   英文默认。kokoro-82m 本地推理（`pip install kokoro soundfile` + `brew install espeak-ng`）。
+  edge     中文、德文默认。edge-tts 云端合成，显式请求 WordBoundary 词级边界 → 字幕节拍最准。
+           VOICE / RATE 不传时按解说词语言取默认（EDGE_DEFAULTS）：
+             zh → zh-CN-YunxiNeural +8%（云希，男声）
+             de → de-DE-ConradNeural +5%（Conrad，男声；实测约 2.7 词/秒去静音；备选 KillianNeural / FlorianMultilingualNeural，女声 KatjaNeural）
+             en → en-US-AndrewNeural +0%（只在显式 TTS_ENGINE=edge 时用到）
+  kokoro   英文默认。kokoro-82m 本地推理（`pip install kokoro soundfile` + `brew install espeak-ng`）。**kokoro 没有德文**。
            KOKORO_VOICE=am_liam（Liam，男声，与中文云希同定位）KOKORO_LANG=a KOKORO_SPEED=1.0
   kokoro 没有词边界 → 改为「逐字幕块分别合成再拼接」，块起始帧因此也是精确的（CHUNK_PAD 调块间静音）。
   用户有别的 TTS 偏好时不走本脚本：让他给成品配音 wav，按逐句/逐块时间轴手填 timeline.ts 与 subs.ts。
@@ -27,13 +31,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REM = ROOT
 _cfg = open(f'{ROOT}/src/config.ts', encoding='utf-8').read()
 SLUG = re.search(r"slug:\s*'([^']+)'", _cfg).group(1)
-_m = re.search(r"lang:\s*'(zh|en)'", _cfg)
+_m = re.search(r"lang:\s*'(zh|en|de)'", _cfg)
 CFG_LANG = _m.group(1) if _m else 'zh'
 FPS = 30
 SR = 48000
 ENGINE = os.environ.get('TTS_ENGINE', 'auto')
-VOICE = os.environ.get('VOICE', 'zh-CN-YunxiNeural')
-RATE = os.environ.get('RATE', '+8%')
+# edge-tts 音色 / 语速：环境变量没给时，main() 按解说词语言从这里取默认
+EDGE_DEFAULTS = {'zh': ('zh-CN-YunxiNeural', '+8%'), 'de': ('de-DE-ConradNeural', '+5%'), 'en': ('en-US-AndrewNeural', '+0%')}
+VOICE = os.environ.get('VOICE')
+RATE = os.environ.get('RATE')
 KOKORO_VOICE = os.environ.get('KOKORO_VOICE', 'am_liam')
 KOKORO_LANG = os.environ.get('KOKORO_LANG', 'a')       # a=American English, b=British
 KOKORO_SPEED = float(os.environ.get('KOKORO_SPEED', 1.0))
@@ -78,11 +84,28 @@ def cache_path(text, ext):
     return f'{CACHE}/{hashlib.sha1(sig.encode()).hexdigest()[:16]}{ext}'
 
 
+# 德 / 英功能词表（只放两种语言里不会互相串的词；in / an / so / die 这类两边都有的不放）
+_DE_STOP = {'der', 'das', 'und', 'ist', 'nicht', 'ein', 'eine', 'einen', 'einem', 'einer', 'mit', 'wird', 'werden', 'auch', 'für',
+            'auf', 'sich', 'dass', 'wie', 'aber', 'oder', 'wir', 'sie', 'es', 'im', 'zu', 'von', 'den', 'dem', 'bei', 'nach',
+            'über', 'kann', 'hat', 'haben', 'sind', 'wenn', 'dann', 'noch', 'nur', 'man', 'aus', 'als', 'zum', 'zur', 'ohne', 'diese', 'dieser', 'dieses'}
+_EN_STOP = {'the', 'and', 'is', 'not', 'a', 'with', 'will', 'be', 'also', 'for', 'on', 'that', 'how', 'but', 'or', 'we', 'they',
+            'it', 'to', 'of', 'by', 'after', 'about', 'can', 'has', 'have', 'are', 'if', 'then', 'still', 'only', 'from', 'as',
+            'this', 'at', 'you', 'your', 'its', 'into', 'when', 'what', 'which', 'these', 'those', 'because'}
+
+
 def detect_lang(items):
-    """解说词里 CJK 占比 ≥20% → 'zh'，否则 'en'。"""
+    """解说词里 CJK 占比 ≥20% → 'zh'；否则按德 / 英功能词计数分 'de' / 'en'（有 äöüß 时平票判德）。"""
     txt = ''.join(it['raw'] for it in items if it['type'] == 'sent')
     cjk = sum(1 for c in txt if '一' <= c <= '鿿')
-    return 'zh' if cjk >= 0.2 * max(1, len(txt)) else 'en'
+    if cjk >= 0.2 * max(1, len(txt)):
+        return 'zh'
+    words = re.findall(r"[a-zA-ZäöüÄÖÜß]+", txt.lower())
+    de = sum(1 for w in words if w in _DE_STOP)
+    en = sum(1 for w in words if w in _EN_STOP)
+    umlaut = bool(re.search(r'[äöüÄÖÜß]', txt))
+    if de > en or (de == en and umlaut):
+        return 'de'
+    return 'en'
 
 
 # 字幕块宽度预判：与 src/common/textfit.ts 用同一张 em 宽表（字体 fontTools 实测），
@@ -90,7 +113,7 @@ def detect_lang(items):
 # 授稿建议仍是每块中文 ≤16 字 / 英文 ≤48 字符（见 narration-storyboard.md）。
 SUB_MAX_W = 1160
 SUB_SIZE = 44
-SUB_BUDGET = {'zh': '16 字', 'en': '48 字符'}
+SUB_BUDGET = {'zh': '16 字', 'en': '48 字符', 'de': '48 字符'}
 
 
 def text_em(s):
@@ -189,12 +212,12 @@ def trim_edges(x, thr=0.004):
 
 def chunk_starts(tts_text, chunks, words, lead_cut, dur, sep=''):
     """按 | 切出的字幕短句 → 每块在句内的起始秒。word 边界按字符游标对到原句。
-    tts_text == sep.join(chunks)：英文 sep=' '，游标要跳过块间的那个空格。"""
+    tts_text == sep.join(chunks)：拉丁语言（英/德）sep=' '，游标要跳过块间的那个空格。"""
     # 每个字符的起始时间（按 word 边界填充）
     char_t = [None] * len(tts_text)
     cur = 0
     for w in words:
-        wt = re.sub(r'[\s，。、！？：；“”（）,.!?:;()\-—…]', '', w['text'])
+        wt = re.sub(r'[\s，。、！？：；“”（）,.!?:;()\-—…„‚‘’»«–"]', '', w['text'])
         if not wt:
             continue
         p = tts_text.find(wt, cur)
@@ -226,7 +249,7 @@ def chunk_starts(tts_text, chunks, words, lead_cut, dur, sep=''):
 
 
 async def synth_sentence(chunks, sep=''):
-    """一句 → (音频 float32 单声道, 每个字幕块在句内的起始秒, 句长秒)。sep 是块之间的连接符（英文 ' '，中文 ''）。
+    """一句 → (音频 float32 单声道, 每个字幕块在句内的起始秒, 句长秒)。sep 是块之间的连接符（英/德 ' '，中文 ''）。
     edge：整句合成一次，块起点按词边界对齐（最准）。
     kokoro：无词边界 → 逐字幕块分别合成再拼接，块起点因此是精确的，代价是块界断句略生硬。"""
     text = sep.join(chunks)
@@ -248,17 +271,23 @@ async def synth_sentence(chunks, sep=''):
 
 
 async def main(narr):
-    global ENGINE
+    global ENGINE, VOICE, RATE
     items = parse(narr)
     lang = detect_lang(items)
     if ENGINE == 'auto':
-        ENGINE = 'edge' if lang == 'zh' else 'kokoro'
+        ENGINE = 'kokoro' if lang == 'en' else 'edge'   # 中文、德文 → edge-tts（kokoro 没有德文）
         print(f'解说词语言 {lang} → TTS_ENGINE={ENGINE}（有偏好请显式传 TTS_ENGINE=…）')
+    if ENGINE == 'kokoro' and lang == 'de':
+        raise SystemExit('kokoro-82m 没有德文音色；德文片请用 TTS_ENGINE=edge（默认 VOICE=de-DE-ConradNeural）或自备配音')
+    if VOICE is None:
+        VOICE = EDGE_DEFAULTS.get(lang, EDGE_DEFAULTS['en'])[0]
+    if RATE is None:
+        RATE = EDGE_DEFAULTS.get(lang, EDGE_DEFAULTS['en'])[1]
     if lang != CFG_LANG:
         print(f"⚠ src/config.ts 的 lang: '{CFG_LANG}' 与解说词语言 {lang} 不一致——改过来，"
               f"否则标题压窄与居中基线会按错的语言算")
-    # 字幕块拼回整句给 TTS 时的连接符：英文词与词之间要有空格（否则 "powerful|but" 会被念成 powerfulbut），中文直接拼
-    sep = ' ' if lang == 'en' else ''
+    # 字幕块拼回整句给 TTS 时的连接符：拉丁语言词与词之间要有空格（否则 "powerful|but" 会被念成 powerfulbut），中文直接拼
+    sep = '' if lang == 'zh' else ' '
     t = LEAD / FPS
     audio_parts = []  # (start_sec, np.array)
     sentences = []; chapters = []
@@ -282,7 +311,7 @@ async def main(narr):
         sentences.append({'id': f'S{sid:02d}', 'chapter': it['chapter'], 'from': f0, 'to': f1, 'text': tts_text,
                           'subs': [{'from': int(round(a * FPS)) + 1, 'to': int(round(b * FPS)), 'text': c} for c, (a, b) in zip(chunks, subs)]})
         audio_parts.append((t, x))
-        total_chars += len(re.sub(r'[，。、！？：；“”（）,.!?:;()\-—…\s]', '', tts_text))
+        total_chars += len(re.sub(r'[，。、！？：；“”（）,.!?:;()\-—…„‚‘’»«–"\s]', '', tts_text))
         total_words += len(tts_text.split()); speech_sec += dur
         t += dur + GAP / FPS
     t += TAIL / FPS
