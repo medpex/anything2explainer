@@ -126,12 +126,14 @@ def write_wav(path, x, sr):
 
 
 async def synth_edge(text):
-    """edge-tts：整句合成 + 词级边界（会把 text 发送到微软云端端点）。"""
+    """edge-tts：整句合成 + 词级边界（会把 text 发送到微软云端端点）。
+    edge-tts 7.x 的 Communicate 默认 boundary='SentenceBoundary'，不显式要 WordBoundary 就一个词边界都拿不到，
+    字幕块起点会全部退化成按字数线性插值——这里必须传。"""
     import edge_tts
     mp3 = cache_path(text, '.mp3'); js = cache_path(text, '.json')
     if os.path.exists(mp3) and os.path.exists(js):
         return mp3, json.load(open(js))
-    comm = edge_tts.Communicate(text, VOICE, rate=RATE)
+    comm = edge_tts.Communicate(text, VOICE, rate=RATE, boundary='WordBoundary')
     audio = bytearray(); words = []
     async for ch in comm.stream():
         if ch['type'] == 'audio':
